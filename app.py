@@ -111,7 +111,7 @@ def render_main_html():
             <td style="font-size:1.1em;font-weight:700;color:{color}">{price}</td>
             <td style="color:{color};font-weight:600">{arrow} {chg_str}</td>
             <td style="color:{color}">{pct_str}</td>
-            <td>{open_p}</td><td>{high}</td><td>{low}</td>
+            
             <td>
                 <input type="number" min="0" value="0"
                        id="qty_{i}" data-sid="{sid}" data-chg="{chg_val}"
@@ -160,13 +160,14 @@ def render_main_html():
   <tr>
     <th>代號</th><th>名稱</th><th>成交價</th>
     <th>漲跌</th><th>漲跌幅</th>
+    
     <th>張數</th><th>當日損益</th>
   </tr>
   </thead>
   <tbody>
   {rows}
   <tr class="total-row">
-    <td colspan="9" style="text-align:right">📊 當日損益合計</td>
+    <td colspan="6" style="text-align:right">📊 當日損益合計</td>
     <td id="total">—</td>
   </tr>
   </tbody>
