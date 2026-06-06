@@ -160,7 +160,6 @@ def render_main_html():
   <tr>
     <th>代號</th><th>名稱</th><th>成交價</th>
     <th>漲跌</th><th>漲跌幅</th>
-    <th>開盤</th><th>最高</th><th>最低</th>
     <th>張數</th><th>當日損益</th>
   </tr>
   </thead>
