@@ -35,40 +35,31 @@ cache = {"data": [], "updated_at": "—"}
 
 
 def fetch_price(stock_id):
-    for market in ["tse", "otc"]:
-        url = (
-            f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
-            f"?ex_ch={market}_{stock_id}.tw&json=1&delay=0"
-        )
+    # 台股代號加 .TW 或 .TWO 給 Yahoo Finance
+    for suffix in [".TW", ".TWO"]:
+        ticker = stock_id + suffix
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
         try:
-            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            items = resp.json().get("msgArray", [])
-            if items:
-                d = items[0]
-                price  = d.get("z", "-")
-                yclose = d.get("y", "-")
-                high   = d.get("h", "-")
-                low    = d.get("l", "-")
-                open_p = d.get("o", "-")
-                y = float(yclose) if yclose and yclose != "-" else None
-                # 跌停/漲停時 z="-"，改用買進價(b)或賣出價(a)
-                if not price or price == "-":
-                    b = d.get("b", "-")
-                    a = d.get("a", "-")
-                    if b and b != "-":
-                        price = b.split("_")[0]
-                    elif a and a != "-":
-                        price = a.split("_")[0]
-                if price and price != "-":
-                    p   = float(price)
-                    chg = round(p - y, 2) if y else None
-                    chg_pct = round((p - y) / y * 100, 2) if y else None
-                    return {
-                        "price": p, "chg": chg, "chg_pct": chg_pct,
-                        "high": float(high) if high and high != "-" else None,
-                        "low":  float(low)  if low  and low  != "-" else None,
-                        "open": float(open_p) if open_p and open_p != "-" else None,
-                    }
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+            resp = requests.get(url, headers=headers, timeout=10)
+            data = resp.json()
+            meta = data["chart"]["result"][0]["meta"]
+            price  = meta.get("regularMarketPrice")
+            yclose = meta.get("chartPreviousClose") or meta.get("previousClose")
+            high   = meta.get("regularMarketDayHigh")
+            low    = meta.get("regularMarketDayLow")
+            open_p = meta.get("regularMarketOpen")
+            if price:
+                p = round(float(price), 2)
+                y = float(yclose) if yclose else None
+                chg = round(p - y, 2) if y else None
+                chg_pct = round((p - y) / y * 100, 2) if y else None
+                return {
+                    "price": p, "chg": chg, "chg_pct": chg_pct,
+                    "high": round(float(high), 2) if high else None,
+                    "low":  round(float(low), 2)  if low  else None,
+                    "open": round(float(open_p), 2) if open_p else None,
+                }
         except Exception:
             pass
     return None
