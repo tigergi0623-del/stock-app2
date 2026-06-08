@@ -34,8 +34,36 @@ PORT = int(os.environ.get("PORT", 8888))
 cache = {"data": [], "updated_at": "—"}
 
 
+FUGLE_API_KEY = os.environ.get("FUGLE_API_KEY", "204ce61a-e4f1-43b6-8376-3963a12407d8")
+
 def fetch_price(stock_id):
-    # 台股代號加 .TW 或 .TWO 給 Yahoo Finance
+    # 先試 Fugle 即時 API
+    try:
+        url = f"https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/{stock_id}"
+        headers = {"X-API-KEY": FUGLE_API_KEY}
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            d = resp.json()
+            price  = d.get("closePrice") or d.get("lastPrice")
+            yclose = d.get("previousClose")
+            high   = d.get("highPrice")
+            low    = d.get("lowPrice")
+            open_p = d.get("openPrice")
+            if price:
+                p = round(float(price), 2)
+                y = float(yclose) if yclose else None
+                chg = round(p - y, 2) if y else None
+                chg_pct = round((p - y) / y * 100, 2) if y else None
+                return {
+                    "price": p, "chg": chg, "chg_pct": chg_pct,
+                    "high": round(float(high), 2) if high else None,
+                    "low":  round(float(low), 2)  if low  else None,
+                    "open": round(float(open_p), 2) if open_p else None,
+                }
+    except Exception:
+        pass
+
+    # 備用：Yahoo Finance（15分鐘延遲）
     for suffix in [".TW", ".TWO"]:
         ticker = stock_id + suffix
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
