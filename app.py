@@ -50,9 +50,17 @@ def fetch_price(stock_id):
                 high   = d.get("h", "-")
                 low    = d.get("l", "-")
                 open_p = d.get("o", "-")
+                y = float(yclose) if yclose and yclose != "-" else None
+                # 跌停/漲停時 z="-"，改用買進價(b)或賣出價(a)
+                if not price or price == "-":
+                    b = d.get("b", "-")
+                    a = d.get("a", "-")
+                    if b and b != "-":
+                        price = b.split("_")[0]
+                    elif a and a != "-":
+                        price = a.split("_")[0]
                 if price and price != "-":
                     p   = float(price)
-                    y   = float(yclose) if yclose and yclose != "-" else None
                     chg = round(p - y, 2) if y else None
                     chg_pct = round((p - y) / y * 100, 2) if y else None
                     return {
