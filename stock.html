@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股即時股價</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: #f0f2f5; }
+.header { background: #1a2a4a; color: white; padding: 12px 16px; position: sticky; top: 0; z-index: 10; }
+.header h1 { font-size: 1.1em; }
+.header .meta { font-size: 0.78em; color: #aac; margin-top: 3px; }
+.status-bar { text-align: center; padding: 7px; font-size: 0.8em; color: #555; background: #fff; border-bottom: 1px solid #eee; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+thead { background: #1a2a4a; color: white; }
+thead th { padding: 7px 4px; text-align: center; font-size: 0.78em; }
+tbody tr { border-bottom: 1px solid #e8e8e8; background: white; }
+tbody tr:nth-child(even) { background: #f8f9fa; }
+td { padding: 9px 4px; text-align: center; }
+td.name { text-align: left; font-weight: 600; padding-left: 6px; }
+.up { color: #c0392b; } .down { color: #2070c0; } .flat { color: #555; }
+input.qty { width: 58px; padding: 4px 2px; border: 1px solid #ccc; border-radius: 6px; text-align: center; font-size: 0.95em; }
+.pnl { font-weight: bold; }
+.total-bar { background: #1a2a4a; color: white; text-align: right; padding: 12px 16px; font-size: 0.95em; }
+.total-bar span { font-size: 1.15em; font-weight: bold; }
+.btn { background: #2ecc71; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.9em; cursor: pointer; margin: 8px; }
+.refresh-bar { text-align: center; padding: 6px; background: #f8f9fa; border-bottom: 1px solid #eee; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📈 台股即時股價</h1>
+  <div class="meta" id="meta">載入中...</div>
+</div>
+<div class="refresh-bar">
+  <button class="btn" onclick="updateAll()">🔄 手動更新</button>
+</div>
+<div class="status-bar" id="status">⏳ 正在抓取股價...</div>
+<table>
+  <thead>
+    <tr><th>代號</th><th>名稱</th><th>成交價</th><th>漲跌</th><th>漲跌幅</th><th>張數</th><th>當日損益</th></tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+<div class="total-bar">當日損益合計：<span id="total">—</span></div>
+
+<script>
+const STOCKS = [
+  {id:"2330",  name:"台積電",            sfx:".TW"},
+  {id:"2383",  name:"台光電",            sfx:".TW"},
+  {id:"3563",  name:"牧德",              sfx:".TW"},
+  {id:"6831",  name:"邁科",              sfx:".TWO"},
+  {id:"3030",  name:"德律",              sfx:".TW"},
+  {id:"3374",  name:"精材",              sfx:".TW"},
+  {id:"3189",  name:"景碩",              sfx:".TW"},
+  {id:"2327",  name:"國巨",              sfx:".TW"},
+  {id:"2492",  name:"華新科",            sfx:".TW"},
+  {id:"00981A",name:"主動統一台股增長",  sfx:".TW"},
+  {id:"00403A",name:"主動統一升級50",    sfx:".TW"},
+];
+const DEF = {"2330":0,"2383":4,"3563":10,"6831":12,"3030":10,"3374":20,"3189":16,"2327":6,"2492":10,"00981A":200,"00403A":300};
+const KEY = "sqty3";
+
+function loadQty(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch{ return {}; } }
+function saveQty(){
+  const q={};
+  STOCKS.forEach(s=>{ const e=document.getElementById("q"+s.id); if(e) q[s.id]=e.value; });
+  localStorage.setItem(KEY,JSON.stringify(q));
+}
+
+const saved = loadQty();
+const tbody = document.getElementById("tbody");
+STOCKS.forEach(s=>{
+  const qty = saved[s.id]??DEF[s.id]??0;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${s.id}</td><td class="name">${s.name}</td><td id="p${s.id}">—</td><td id="c${s.id}">—</td><td id="r${s.id}">—</td><td><input class="qty" type="number" min="0" id="q${s.id}" value="${qty}" oninput="saveQty();calcPnl()"></td><td class="pnl" id="l${s.id}">—</td>`;
+  tbody.appendChild(tr);
+});
+
+function calcPnl(){
+  let total=0, hasAny=false;
+  STOCKS.forEach(s=>{
+    const qe=document.getElementById("q"+s.id);
+    const le=document.getElementById("l"+s.id);
+    const chg=parseFloat(qe?.dataset.chg);
+    const qty=parseFloat(qe?.value)||0;
+    if(!isNaN(chg)&&qty>0){
+      const pnl=qty*chg*1000;
+      hasAny=true;
+      le.textContent=(pnl>=0?"+":"")+Math.round(pnl).toLocaleString()+" 元";
+      le.className="pnl "+(pnl>0?"up":pnl<0?"down":"flat");
+      total+=pnl;
+    } else { le.textContent="—"; le.className="pnl flat"; }
+  });
+  const te=document.getElementById("total");
+  if(hasAny){
+    te.textContent=(total>=0?"+":"")+Math.round(total).toLocaleString()+" 元";
+    te.style.color=total>0?"#ffaaaa":total<0?"#aaccff":"white";
+  }
+}
+
+function fmt(n,d=2){ return n==null?"—":n.toLocaleString("zh-TW",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+async function fetchOne(s){
+  // 嘗試多個 proxy 服務
+  const ticker = s.id + s.sfx;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`)}`,
+  ];
+  for(const url of proxies){
+    try{
+      const r = await fetch(url);
+      if(!r.ok) continue;
+      const data = await r.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if(!meta?.regularMarketPrice) continue;
+      const price = meta.regularMarketPrice;
+      const prev  = meta.chartPreviousClose;
+      const chg   = meta.regularMarketChange ?? (prev ? price-prev : null);
+      const chgPct= meta.regularMarketChangePercent ?? (chg&&prev ? chg/prev*100 : null);
+      return { price, chg, chgPct };
+    } catch(e){}
+  }
+  return null;
+}
+
+async function updateAll(){
+  document.getElementById("status").textContent="⏳ 更新中...";
+  let ok=0;
+  for(const s of STOCKS){
+    const d = await fetchOne(s);
+    const pe=document.getElementById("p"+s.id);
+    const ce=document.getElementById("c"+s.id);
+    const re=document.getElementById("r"+s.id);
+    const qe=document.getElementById("q"+s.id);
+    if(d?.price){
+      ok++;
+      const cls=d.chg>0?"up":d.chg<0?"down":"flat";
+      const arrow=d.chg>0?"▲":d.chg<0?"▼":"—";
+      pe.textContent=fmt(d.price); pe.className=cls;
+      ce.textContent=arrow+" "+(d.chg>=0?"+":"")+fmt(d.chg); ce.className=cls;
+      re.textContent=(d.chgPct>=0?"+":"")+fmt(d.chgPct)+"%"; re.className=cls;
+      qe.dataset.chg=d.chg;
+    }
+    await new Promise(r=>setTimeout(r,200));
+  }
+  calcPnl();
+  const now=new Date().toLocaleString("zh-TW");
+  document.getElementById("meta").textContent=`更新：${now}　每30秒自動更新`;
+  document.getElementById("status").textContent=ok>0?`✅ 已更新 ${ok}/${STOCKS.length} 檔`:"⚠️ 無法取得資料";
+}
+
+updateAll();
+setInterval(updateAll, 30000);
+</script>
+</body>
+</html>
